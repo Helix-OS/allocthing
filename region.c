@@ -15,6 +15,7 @@ region_t *bitmap_region_init_at_addr( void *vaddr,
 	ret->data = bitmap;
 	ret->alloc_page = bitmap_region_alloc_page;
 	ret->free_page  = bitmap_region_free_page;
+	ret->extra_data = 0;
 
 	return ret;
 }
@@ -59,14 +60,16 @@ void *bitmap_region_alloc_page( region_t *region, unsigned n ){
 	unsigned i;
 	bool found = false;
 
-	for ( i = 0; i < region->pages && !found; ) {
-		if ( bitmap[i] & 0xff == 0xff ){
+	for ( i = region->extra_data; i < region->pages && !found; ) {
+		if (( bitmap[i] & 0xff ) == 0xff ){
 			i++;
 
 		} else {
-			//unsigned first_free = i * 8;
-			unsigned first_free = i;
+			unsigned first_free = i * 8;
+			//unsigned first_free = i;
 			uintptr_t temp = (uintptr_t)region->addr;
+
+			region->extra_data = i;
 
 			for ( ; bitmap_get( bitmap, first_free ); first_free++ );
 
@@ -75,7 +78,21 @@ void *bitmap_region_alloc_page( region_t *region, unsigned n ){
 			ret = (void *)temp;
 			found = true;
 
+			/*
 			printf( "[%s] Found free bit at %u, returning %p\n", __func__, first_free, ret );
+
+			{
+				unsigned k;
+				printf( "[%s] bitmap stuff: ", __func__ );
+				for ( k = 0; k < 16; k++ ){
+					printf( "0x%02x ", bitmap[k] );
+				}
+			}
+
+			printf( "\n" );
+
+			printf( "[%s] First free at %u\n", __func__, region->extra_data );
+			*/
 		}
 	}
 
@@ -85,10 +102,14 @@ void *bitmap_region_alloc_page( region_t *region, unsigned n ){
 void  bitmap_region_free_page( region_t *region, void *ptr ){
 	uintptr_t vaddr = (uintptr_t)region->addr;
 	uintptr_t temp  = (uintptr_t)ptr;
-
 	unsigned index = (temp - vaddr) / PAGE_SIZE;
+	unsigned bytepos = index % 8;
 
 	bitmap_unset( region->data, index );
 
-	printf( "[%s] Freeing ptr at %p, bit %u\n", __func__, ptr, index );
+	if ( bytepos <= region->extra_data ){
+		region->extra_data = bytepos;
+	}
+
+	//printf( "[%s] Freeing ptr at %p, bit %u\n", __func__, ptr, index );
 }

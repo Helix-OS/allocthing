@@ -15,5 +15,10 @@ foo.o : $(objs-a)
 libsalloc.so : foo.o
 	gcc -O3 -shared -o libsalloc.so foo.o
 
+.PHONY: clean
 clean:
 	rm -f *.o *.so
+
+.PHONY: test
+test: libsalloc.so
+	LD_PRELOAD=/home/flux/programs/c/allocthing/libsalloc.so bash

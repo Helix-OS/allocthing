@@ -20,6 +20,7 @@ typedef struct region {
 	region_page_free  free_page;
 
 	unsigned pages;
+	unsigned extra_data;
 } region_t;
 
 region_t *bitmap_region_init_at_addr( void *vaddr,

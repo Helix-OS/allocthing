@@ -6,12 +6,12 @@
 
 //#define BLOCK_SIZE     16
 #define BLOCK_SIZE     1
-//#define MAX_FREE_PAGES 128
-#define MAX_FREE_PAGES 1
+#define MAX_FREE_PAGES 128
+//#define MAX_FREE_PAGES 1
 #define ALIGN_BLOCKS   0
 
-//#define SLAB_64_BIT_MAP
-#define SLAB_32_BIT_MAP
+#define SLAB_64_BIT_MAP
+//#define SLAB_32_BIT_MAP
 //#define SLAB_16_BIT_MAP
 //#define SLAB_8_BIT_MAP
 
