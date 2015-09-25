@@ -5,7 +5,7 @@
 #include "region.h"
 
 //#define BLOCK_SIZE     16
-#define BLOCK_SIZE     1
+#define BLOCK_SIZE     4
 #define MAX_FREE_PAGES 128
 //#define MAX_FREE_PAGES 1
 #define ALIGN_BLOCKS   0

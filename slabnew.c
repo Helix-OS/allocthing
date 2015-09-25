@@ -47,19 +47,7 @@ void dump_cache_blocks( slab_cache_t *cache, slab_t *slab ){
 }
 
 static inline void *slab_cache_alloc_pages( slab_cache_t *cache, unsigned n ){
-	/*
-	void *ret = mmap( NULL, PAGE_SIZE * n,
-			PROT_READ | PROT_WRITE,
-			MAP_ANONYMOUS | MAP_PRIVATE,
-			-1, 0 );
-	*/
-	void *ret = cache->region->alloc_page( cache->region, 1 );
-
-	/*
-	if ( ret ){
-		cache->pages_alloced += n;
-	}
-	*/
+	void *ret = cache->region->alloc_page( cache->region, n );
 
 	return ret;
 }
@@ -165,7 +153,6 @@ void free_one_cache_page( slab_cache_t *cache ){
 		if ( tmp->last ) tmp->last->next = tmp->next;
 
 		slab_cache_do_dtors( cache, tmp );
-		//munmap( tmp, PAGE_SIZE );
 		cache->region->free_page( cache->region, tmp );
 		//printf( "freed one slab at %p\n", tmp );
 	}

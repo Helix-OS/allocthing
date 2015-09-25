@@ -59,6 +59,7 @@ void *bitmap_region_alloc_page( region_t *region, unsigned n ){
 	uint8_t *bitmap = region->data;
 	unsigned i;
 	bool found = false;
+	bool set_index = false;
 
 	for ( i = region->extra_data; i < region->pages && !found; ) {
 		if (( bitmap[i] & 0xff ) == 0xff ){
@@ -66,20 +67,44 @@ void *bitmap_region_alloc_page( region_t *region, unsigned n ){
 
 		} else {
 			unsigned first_free = i * 8;
-			//unsigned first_free = i;
 			uintptr_t temp = (uintptr_t)region->addr;
+			unsigned k;
 
-			region->extra_data = i;
+			if ( !set_index ){
+				region->extra_data = i;
+				set_index = true;
+			}
 
 			for ( ; bitmap_get( bitmap, first_free ); first_free++ );
 
-			bitmap_set( bitmap, first_free );
+			if ( n > 1 ){
+				bool is_free = true;
+
+				for ( k = 0; k < n && is_free; k++ ){
+					is_free = bitmap_get( bitmap, first_free + k ) == 0;
+				}
+
+				if ( !is_free ){
+					i += 1;
+					continue;
+
+				} else {
+					for ( k = 0; k < n; k++ ){
+						bitmap_set( bitmap, first_free + k );
+					}
+				}
+
+			} else {
+				bitmap_set( bitmap, first_free );
+			}
+
 			temp += first_free * PAGE_SIZE;
 			ret = (void *)temp;
 			found = true;
 
 			/*
-			printf( "[%s] Found free bit at %u, returning %p\n", __func__, first_free, ret );
+			printf( "[%s] Found %u free bit(s) at %u, returning %p\n",
+				__func__, n, first_free, ret );
 
 			{
 				unsigned k;

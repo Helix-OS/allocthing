@@ -2,9 +2,11 @@
 #include "slabnew.h"
 #include <stdbool.h>
 #include <string.h>
+#include "region.h"
 
 typedef struct sheap {
 	slab_cache_t caches[16];
+	region_t *region;
 	unsigned max_size;
 } sheap_t;
 
@@ -25,6 +27,7 @@ sheap_t *sheap_init_at_addr( void *addr, region_t *region ){
 	unsigned i = 0;
 
 	ret->max_size = 1024;
+	ret->region = region;
 
 	for ( i = 1; i <= maxbits; i++ ){
 		if ( sheap_valid_denom( i )) {
@@ -66,10 +69,12 @@ void *sheap_alloc( sheap_t *heap, unsigned size ){
 	// and just map pages for larger blocks, including the length of the
 	// allocation in the first 4 bytes allocated
 	} else {
-		ret = mmap( NULL, size + sizeof(uint32_t),
-				PROT_READ | PROT_WRITE,
-				MAP_ANONYMOUS | MAP_PRIVATE,
-				-1, 0 );
+		unsigned npages = (size + sizeof(uint32_t)) / PAGE_SIZE;
+		npages += (size % PAGE_SIZE) > 0;
+
+		printf( "[%s] Allocating %u pages for size %u\n", __func__, npages, size );
+
+		ret = heap->region->alloc_page( heap->region, npages );
 
 		*(uint32_t *)ret = size + sizeof(uint32_t);
 		ret = (void *)((uintptr_t)ret + sizeof(uint32_t));
@@ -78,7 +83,7 @@ void *sheap_alloc( sheap_t *heap, unsigned size ){
 	return ret;
 }
 
-void sheap_free( void *ptr ){
+void sheap_free( sheap_t *heap, void *ptr ){
 	uintptr_t temp = (uintptr_t)ptr;
 	
 	if ( ptr ){
@@ -86,12 +91,18 @@ void sheap_free( void *ptr ){
 		if (( temp & (PAGE_SIZE - 1)) != 0x004 ){
 			slab_free_from_ptr( ptr );
 
-			// and unmap the pages mapped for larger blocks
+		// and unmap the pages mapped for larger blocks
 		} else {
 			void *pageptr = (void *)(temp & ~(PAGE_SIZE - 1));
+			unsigned size = *(uint32_t *)pageptr;
+			unsigned npages = (size / PAGE_SIZE) + (size % PAGE_SIZE > 0);
+			unsigned i;
 
 			printf( "got here, %p\n", pageptr );
-			munmap( pageptr, *(uint32_t *)pageptr );
+
+			for ( i = 0; i < npages; i++ ){
+				heap->region->free_page( heap->region, pageptr );
+			}
 		}
 	}
 }
@@ -123,7 +134,6 @@ void *sheap_realloc( sheap_t *heap, void *ptr, unsigned size ){
 			obj_size = is_mapped_alloc( ptr )
 			         ? mapped_alloc_size( ptr )
 			         : slab_ptr_get_obj_size( ptr );
-			//unsigned obj_size = slab_ptr_get_obj_size( ptr );
 
 			memcpy( ret, ptr, (obj_size < size)? obj_size : size );
 		}
@@ -158,7 +168,8 @@ static inline void __sheap_unlock( void ){
 }
 
 static inline void __sheap_spinlock( void ){
-	while ( __sheap_is_locked ) puts( "LOCKED MAN" );
+	//while ( __sheap_is_locked ) puts( "LOCKED MAN" );
+	while ( __sheap_is_locked );
 }
 
 static region_t __global_region;
@@ -216,7 +227,7 @@ void free( void *ptr ){
 	__sheap_lock( );
 
 	if ( __sheap_initialized ){
-		sheap_free( ptr );
+		sheap_free( &__sheap_global_heap, ptr );
 	}
 
 	__sheap_unlock( );
